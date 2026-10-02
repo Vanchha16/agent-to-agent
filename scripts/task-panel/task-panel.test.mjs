@@ -12,6 +12,7 @@ import { createPanel, reportMatches } from './core.mjs'
 import { startPanelServer } from './server.mjs'
 import { createLifecycleTracker } from './ui/src/lib/lifecycle.ts'
 import { COLUMNS, boardColumn, deriveStudio, groupBoard, matchesFilter, stagesFor } from './ui/src/lib/derive.ts'
+import { OFF_CONFIRMED, OFF_UNCONFIRMED, requestOff, switchOff } from './ui/src/lib/autoSendOff.ts'
 import { DEFAULT_TEMPLATE, TEMPLATES, TEMPLATE_IDS, TEMPLATE_STORAGE_KEY, loadTemplate, parseTemplateId, saveTemplate } from './ui/src/lib/templates.ts'
 
 // A tiny stand-in for the Vite build (index.html + manifest + hashed assets) inside a fixture.
@@ -352,6 +353,276 @@ test('without a UI build the server explains how to build it instead of serving 
   assert.equal(page.status, 503)
   assert.match(page.body, /npm.cmd run ui:build/)
   assert.equal((await raw(`http://${host}/assets/index.js`, { headers: { Host: host } })).status, 404)
+})
+
+// ---------- Auto-send (opt-in, future-only; scripts/task-panel/core.mjs) ----------
+// A controllable clock and short timings: the lease lasts 10 s and a draft must be unchanged for 1 s.
+function autoPanel(root) {
+  const clock = { t: Date.parse('2026-10-02T10:00:00Z') }
+  const panel = createPanel({ root, now: () => new Date(clock.t), autoSendTiming: { leaseMs: 10_000, stableMs: 1_000 } })
+  const advance = ms => { clock.t += ms }
+  return { panel, advance }
+}
+
+// Simulated receiver report for a fixture task (never written into the real project).
+async function simulateReport(root, id, status = 'completed', questions = '') {
+  await writeFile(path.join(root, 'report', `${id}-report.md`), reportText(id, status, questions))
+}
+
+const publishedIds = async root => (await readdir(path.join(root, 'prompt'))).filter(name => name.endsWith('.md')).map(name => name.slice(0, -3)).sort()
+
+test('auto-send: off by default; drafting publishes nothing and the server rejects ticks without a real activation', async t => {
+  const root = await fixture(t)
+  const { panel } = autoPanel(root)
+  await addDraft(root, 'new-plan')
+  assert.equal(panel.autoSend.status().on, false)
+  await assert.rejects(panel.autoSend.tick('made-up-lease'), { status: 409 }, 'no activation means no automatic publication')
+  const { lease } = await panel.autoSend.activate()
+  await assert.rejects(panel.autoSend.tick('another-page-lease'), { status: 403 }, 'only the activating page can run it')
+  await assert.rejects(panel.autoSend.tick(undefined), { status: 403 })
+  await assert.rejects(panel.autoSend.activate(), { status: 409 }, 'a second page cannot start a parallel activation')
+  await panel.autoSend.deactivate()
+  await assert.rejects(panel.autoSend.tick(lease), { status: 409 }, 'after Off the old lease is useless')
+  assert.deepEqual(await publishedIds(root), [])
+})
+
+test('auto-send: only drafts created after activation are sent; existing, malformed, edited, and recreated drafts stay manual', async t => {
+  const root = await fixture(t)
+  const { panel, advance } = autoPanel(root)
+  await addDraft(root, 'old-valid')
+  await addDraft(root, 'old-broken', { report: 'report/elsewhere.md' })
+  await addDraft(root, 'old-deleted')
+  const { lease, status } = await panel.autoSend.activate()
+  assert.equal(status.excluded, 3)
+
+  // Edit an existing draft, fix the malformed one, and delete/recreate another: all still excluded.
+  await addDraft(root, 'old-valid', { extra: 'Edited after activation.\n' })
+  await addDraft(root, 'old-broken')
+  await rm(path.join(root, 'prompt', 'drafts', 'old-deleted.md'))
+  await panel.autoSend.tick(lease)
+  await addDraft(root, 'old-deleted', { extra: 'Recreated.\n' })
+  // A new file that reuses an existing Task ID is not a new identity either.
+  await writeFile(path.join(root, 'prompt', 'drafts', 'copy-of-old.md'), draftText('old-valid'))
+  // A genuinely new draft, first written incomplete (malformed), then completed.
+  await writeFile(path.join(root, 'prompt', 'drafts', 'fresh-plan.md'), '# Fresh plan\n\nTask ID: fresh-plan\nDelivery status: DRAFT - DO NOT EXECUTE\n')
+  let result = await panel.autoSend.tick(lease)
+  assert.equal(result.published, null, 'an incomplete new draft is not sent')
+  const { text: freshText, hash: freshHash } = await addDraft(root, 'fresh-plan')
+  result = await panel.autoSend.tick(lease)
+  assert.equal(result.published, null, 'a just-completed draft waits until it has been unchanged for a moment')
+  advance(1_500)
+  result = await panel.autoSend.tick(lease)
+  assert.equal(result.published?.id, 'fresh-plan')
+  assert.deepEqual(await publishedIds(root), ['fresh-plan'], 'nothing from the activation baseline was published')
+
+  const prompt = await readFile(path.join(root, 'prompt', 'fresh-plan.md'), 'utf8')
+  assert.match(prompt, /^Delivery status: APPROVED FOR EXECUTION$/m)
+  assert.match(prompt, new RegExp(`^User authorization: Auto-send\\. The user turned on Auto-send .*\\(activation ${status.activation}\\)\\..*SHA-256 ${freshHash}\\. It was not individually reviewed or clicked\\.$`, 'm'))
+  assert.doesNotMatch(prompt, /clicked "Send to Claude"|send it/i, 'automation is never recorded as a click or a typed send it')
+  assert.equal(prompt.replace(/^User authorization:.*$/m, '').replace(/^Delivery status:.*$/m, '').replace(/^Source prompt:.*$/m, ''),
+    freshText.replace(/^User authorization:.*$/m, '').replace(/^Delivery status:.*$/m, '').replace(/^Source prompt after approval:.*$/m, ''), 'the published body is the hashed draft')
+  const log = (await readFile(path.join(root, '.tmp', 'task-panel', 'approvals.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+  assert.deepEqual(log.map(entry => [entry.id, entry.method, entry.activation, entry.hash]), [['fresh-plan', 'auto-send', status.activation, freshHash]])
+  const history = (await readFile(path.join(root, '.tmp', 'task-panel', 'auto-send.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+  assert.deepEqual(history[0].excludedDrafts, ['old-broken', 'old-deleted', 'old-valid'])
+})
+
+test('auto-send: one task at a time; a final report releases the next, questions or a blocker pause until the user resumes', async t => {
+  const root = await fixture(t)
+  const { panel, advance } = autoPanel(root)
+  const { lease } = await panel.autoSend.activate()
+  await addDraft(root, 'first-new')
+  advance(10)
+  await addDraft(root, 'second-new')
+  await addDraft(root, 'third-new')
+  await panel.autoSend.tick(lease)
+  advance(1_500)
+  assert.equal((await panel.autoSend.tick(lease)).published?.id, 'first-new', 'oldest first')
+  advance(1_500)
+  let result = await panel.autoSend.tick(lease)
+  assert.equal(result.published, null, 'nothing else is sent while the first task waits for its report')
+  assert.deepEqual(result.status.waitingFor, ['first-new'])
+  await writeFile(path.join(root, 'report', 'first-new-progress.md'), '# Claude progress (SIMULATED)\n\nTask ID: first-new\nSource prompt: prompt/first-new.md\nStatus: acknowledged — working\n')
+  assert.equal((await panel.autoSend.tick(lease)).published, null, 'a progress receipt is not the final report')
+
+  await simulateReport(root, 'first-new', 'completed', '- Should the export include archived rows?')
+  result = await panel.autoSend.tick(lease)
+  assert.equal(result.published, null)
+  assert.deepEqual([result.status.paused?.id, result.status.paused?.reason], ['first-new', 'questions'])
+  advance(1_000)
+  assert.equal((await panel.autoSend.tick(lease)).published, null, 'still paused for the user')
+  await assert.rejects(panel.autoSend.resume('wrong-lease'), { status: 403 })
+  await panel.autoSend.resume(lease)
+  assert.equal((await panel.autoSend.tick(lease)).published?.id, 'second-new')
+
+  await simulateReport(root, 'second-new', 'blocked', '- Which currency?')
+  result = await panel.autoSend.tick(lease)
+  assert.equal(result.status.paused?.reason, 'blocked')
+  await panel.autoSend.resume(lease)
+  assert.equal((await panel.autoSend.tick(lease)).published?.id, 'third-new')
+  await simulateReport(root, 'third-new')
+  result = await panel.autoSend.tick(lease)
+  assert.equal(result.status.paused, null, 'an ordinary report does not pause')
+  assert.deepEqual(result.status.sent.map(item => item.id), ['first-new', 'second-new', 'third-new'])
+})
+
+test('auto-send: historical reports never pause a new activation, and drafts created while Off stay manual after reactivation', async t => {
+  const root = await fixture(t)
+  const { panel, advance } = autoPanel(root)
+  await writeFile(path.join(root, 'prompt', 'old-task.md'), draftText('old-task', { status: 'APPROVED FOR EXECUTION', source: 'prompt/old-task.md' }))
+  await simulateReport(root, 'old-task', 'blocked', '- An old question.')
+  let { lease } = await panel.autoSend.activate()
+  await addDraft(root, 'while-on')
+  await panel.autoSend.tick(lease)
+  advance(1_500)
+  const result = await panel.autoSend.tick(lease)
+  assert.equal(result.status.paused, null, 'an old blocked report does not pause')
+  assert.equal(result.published?.id, 'while-on')
+  await simulateReport(root, 'while-on')
+  await panel.autoSend.deactivate()
+
+  await addDraft(root, 'while-off')
+  ;({ lease } = await panel.autoSend.activate())
+  advance(1_500)
+  await panel.autoSend.tick(lease)
+  advance(1_500)
+  assert.equal((await panel.autoSend.tick(lease)).published, null, 'no retroactive catch-up')
+  assert.ok(!(await publishedIds(root)).includes('while-off'))
+})
+
+test('auto-send: Off and an expired lease stop future sends but never undo a published task', async t => {
+  const root = await fixture(t)
+  const { panel, advance } = autoPanel(root)
+  let { lease } = await panel.autoSend.activate()
+  await addDraft(root, 'sent-one')
+  await panel.autoSend.tick(lease)
+  advance(1_500)
+  assert.equal((await panel.autoSend.tick(lease)).published?.id, 'sent-one')
+  await simulateReport(root, 'sent-one')
+  await addDraft(root, 'after-off')
+  await panel.autoSend.tick(lease)
+  await panel.autoSend.deactivate()
+  advance(5_000)
+  await assert.rejects(panel.autoSend.tick(lease), { status: 409 })
+  assert.deepEqual(await publishedIds(root), ['sent-one'], 'Off does not delete the published task and sends nothing more')
+  assert.equal((await panel.scan()).tasks.find(task => task.id === 'after-off').state, 'draft', 'still available for a manual send')
+
+  // The activating page went away (refresh or close): without ticks the lease expires.
+  ;({ lease } = await panel.autoSend.activate())
+  advance(10_001)
+  assert.equal(panel.autoSend.status().on, false)
+  await assert.rejects(panel.autoSend.tick(lease), { status: 409 })
+  assert.deepEqual(await publishedIds(root), ['sent-one'])
+})
+
+test('auto-send: races with manual sends, simultaneous ticks, and changing drafts never publish twice or publish stale text', async t => {
+  const root = await fixture(t)
+  const { panel, advance } = autoPanel(root)
+  const { lease } = await panel.autoSend.activate()
+  const { hash: firstHash } = await addDraft(root, 'racing-plan')
+  await panel.autoSend.tick(lease)
+  // The draft keeps changing: each change restarts the wait, so a draft being written is never sent.
+  advance(800)
+  await addDraft(root, 'racing-plan', { extra: 'More detail.\n' })
+  advance(800)
+  assert.equal((await panel.autoSend.tick(lease)).published, null)
+  advance(800)
+  const { hash: finalHash } = await addDraft(root, 'racing-plan', { extra: 'Final detail.\n' })
+  await panel.autoSend.tick(lease)
+  advance(1_500)
+  // A manual click with an old hash, a manual click with the current hash, and two ticks, all at once.
+  const outcomes = await Promise.allSettled([
+    panel.send('racing-plan', firstHash), panel.autoSend.tick(lease), panel.send('racing-plan', finalHash), panel.autoSend.tick(lease),
+  ])
+  const published = outcomes.filter(outcome => outcome.status === 'fulfilled' && (outcome.value.published === 'prompt/racing-plan.md' || outcome.value.published?.id === 'racing-plan'))
+  assert.equal(published.length, 1, 'exactly one publication')
+  assert.equal(outcomes[0].status, 'rejected', 'the stale hash is rejected')
+  assert.deepEqual(await publishedIds(root), ['racing-plan'])
+  assert.match(await readFile(path.join(root, 'prompt', 'racing-plan.md'), 'utf8'), /Final detail\./, 'the final text was published, not an earlier one')
+  const log = (await readFile(path.join(root, '.tmp', 'task-panel', 'approvals.jsonl'), 'utf8')).trim().split('\n')
+  assert.equal(log.length, 1)
+  assert.equal(JSON.parse(log[0]).hash, finalHash)
+})
+
+test('auto-send over HTTP: same token and origin checks, lease enforced, status visible to every page', async t => {
+  const root = await fixture(t)
+  const running = await startPanelServer({ root, port: 0, uiDir: await uiBuild(root) })
+  t.after(() => running.close())
+  const host = `127.0.0.1:${running.port}`
+  const origin = `http://${host}`
+  const good = { Host: host, Origin: origin, 'Content-Type': 'application/json', 'X-Panel-Token': running.token, 'Sec-Fetch-Site': 'same-origin' }
+  const post = (body, headers = good) => raw(`${origin}/api/auto-send`, { method: 'POST', headers, body: JSON.stringify(body) })
+  for (const headers of [{ ...good, Origin: 'http://evil.example' }, { ...good, 'X-Panel-Token': 'f'.repeat(64) }, { ...good, 'Sec-Fetch-Site': 'cross-site' }]) {
+    assert.equal((await post({ action: 'on' }, headers)).status, 403, 'forged activations are rejected')
+  }
+  assert.equal((await post({ action: 'tick', lease: 'x' })).status, 409, 'no activation yet')
+  assert.equal((await post({ action: 'teleport' })).status, 400)
+  const on = await post({ action: 'on' })
+  assert.equal(on.status, 200)
+  const { lease, status } = JSON.parse(on.body)
+  assert.ok(lease && status.on)
+  const state = JSON.parse((await raw(`${origin}/api/state`, { headers: good })).body)
+  assert.equal(state.autoSend.on, true)
+  assert.equal(state.autoSend.lease, undefined, 'the lease is never shared with other pages')
+  assert.equal((await post({ action: 'tick', lease: 'not-it' })).status, 403)
+  assert.equal((await post({ action: 'tick', lease })).status, 200)
+  assert.equal((await post({ action: 'off' })).status, 200)
+  assert.equal(JSON.parse((await raw(`${origin}/api/state`, { headers: good })).body).autoSend.on, false)
+})
+
+// ---------- Turning Auto-send off (scripts/task-panel/ui/src/lib/autoSendOff.ts, used by App and useAutoSend) ----------
+test('auto-send off: a failed or unconfirmed Off never announces success; a confirmed Off announces it once', async () => {
+  const run = async call => {
+    const said = []
+    const result = await switchOff(() => requestOff(call), text => said.push(text))
+    return { result, said }
+  }
+  for (const failing of [
+    () => Promise.reject(new TypeError('Failed to fetch')),
+    () => Promise.reject(Object.assign(new Error('The panel hit an unexpected error.'), { status: 500 })),
+    () => Promise.resolve({ status: { on: true, revision: 4 } }),
+    () => Promise.resolve({}),
+  ]) {
+    const { result, said } = await run(failing)
+    assert.equal(result.ok, false)
+    assert.deepEqual(said, [OFF_UNCONFIRMED])
+    assert.ok(!said.includes(OFF_CONFIRMED))
+  }
+  const { result, said } = await run(() => Promise.resolve({ status: { on: false, revision: 5 } }))
+  assert.equal(result.ok, true)
+  assert.deepEqual(said, [OFF_CONFIRMED], 'announced exactly once')
+})
+
+test('auto-send off over HTTP: an unreachable panel leaves Auto-send on and unconfirmed; retrying confirms Off', async t => {
+  const root = await fixture(t)
+  const running = await startPanelServer({ root, port: 0, uiDir: await uiBuild(root) })
+  t.after(() => running.close())
+  const headers = port => ({ Host: `127.0.0.1:${port}`, Origin: `http://127.0.0.1:${port}`, 'Content-Type': 'application/json', 'X-Panel-Token': running.token, 'Sec-Fetch-Site': 'same-origin' })
+  const post = (port, body) => raw(`http://127.0.0.1:${port}/api/auto-send`, { method: 'POST', headers: headers(port), body: JSON.stringify(body) })
+  const callOff = port => async () => {
+    const response = await post(port, { action: 'off' })
+    if (response.status !== 200) throw Object.assign(new Error(JSON.parse(response.body).error), { status: response.status })
+    return JSON.parse(response.body)
+  }
+  assert.equal((await post(running.port, { action: 'on' })).status, 200)
+
+  // A closed port stands in for a stopped or unreachable panel.
+  const closed = await startPanelServer({ root, port: 0, uiDir: await uiBuild(root) })
+  const deadPort = closed.port
+  await closed.close()
+  const said = []
+  const failed = await switchOff(() => requestOff(callOff(deadPort)), text => said.push(text))
+  assert.equal(failed.ok, false)
+  assert.deepEqual(said, [OFF_UNCONFIRMED])
+  assert.equal(running.panel.autoSend.status().on, true, 'the activation really is still on, so the page must not claim Off')
+
+  const retried = await switchOff(() => requestOff(callOff(running.port)), text => said.push(text))
+  assert.equal(retried.ok, true)
+  assert.deepEqual(said, [OFF_UNCONFIRMED, OFF_CONFIRMED])
+  assert.equal(running.panel.autoSend.status().on, false)
+  // Off is idempotent: if a reply was lost after a real Off, retrying still confirms it.
+  assert.equal((await switchOff(() => requestOff(callOff(running.port)), () => {})).ok, true)
+  assert.deepEqual(await readdir(path.join(root, 'prompt')), ['drafts'], 'nothing was published or changed')
 })
 
 // ---------- UI lifecycle events (scripts/task-panel/ui/src/lib/lifecycle.ts) ----------

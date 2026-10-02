@@ -12,7 +12,7 @@ Codex discusses requirements with the user and writes drafts in `prompt/drafts/`
 
 Monitor the project-local `prompt/` folder using the capabilities available in your terminal. If you cannot maintain a monitor, say so in the readiness report rather than claiming automatic delivery works. Do not install tools or change global authentication to establish a monitor without the user's authorization.
 
-Execute only task prompts marked **APPROVED FOR EXECUTION** with a task ID and the user's explicit authorization. Each task needs its own approval; this instruction document does not approve implementation work.
+Execute only task prompts marked **APPROVED FOR EXECUTION** with a task ID and the user's explicit authorization (a typed **send it**, a recorded **Send to Claude** click, or a panel-recorded `User authorization: Auto-send. …` line from a verified Auto-send activation). Each task needs its own approval; this instruction document does not approve implementation work.
 
 ## Implementing and replying
 

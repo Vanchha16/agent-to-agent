@@ -1,4 +1,4 @@
-import type { PanelState } from './types.ts'
+import type { AutoSendStatus, PanelState } from './types.ts'
 
 const token = document.querySelector<HTMLMetaElement>('meta[name="panel-token"]')?.content ?? ''
 
@@ -31,3 +31,8 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const getState = () => call<PanelState>('/api/state')
 export const sendDraft = (id: string, hash: string) => call<{ id: string; published: string; reportPath: string; at: string }>('/api/send', { method: 'POST', body: JSON.stringify({ id, hash }) })
+
+export interface AutoSendResult { status: AutoSendStatus; lease?: string; published?: { id: string; published: string; at: string } | null }
+// keepalive lets the Off request finish while the page is being closed or refreshed.
+export const autoSend = (action: 'on' | 'off' | 'tick' | 'resume', lease?: string, keepalive = false) =>
+  call<AutoSendResult>('/api/auto-send', { method: 'POST', body: JSON.stringify({ action, lease }), keepalive })

@@ -29,4 +29,19 @@ export interface PanelState {
   active: string[]
   version: string
   project?: string
+  autoSend?: AutoSendStatus
+}
+
+// Auto-send status from the server (GET /api/state and POST /api/auto-send). The lease is never included here.
+export interface AutoSendStatus {
+  on: boolean
+  revision: number
+  activation?: string
+  activatedAt?: string
+  excluded?: number
+  paused?: { id: string; title: string; reason: 'questions' | 'blocked' } | null
+  waitingFor?: string[]
+  queue?: string[]
+  sent?: Array<{ id: string; at: string; hash: string }>
+  lastError?: { id: string; message: string; at: string } | null
 }

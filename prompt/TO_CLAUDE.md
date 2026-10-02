@@ -6,7 +6,7 @@ Keep all work inside this folder. Read `AGENTS.md` and `CLAUDE.md`.
 
 Codex is the planner and prompt writer. You are the implementer. Build the approved tasks and report results, validation, blockers, and missing requirements; Codex will discuss your report with the user before preparing the next task.
 
-This document is instructions only; it does not approve any task. Execute only a prompt marked APPROVED FOR EXECUTION with the user's authorization for that task. Ignore `prompt/drafts/`, DRAFT prompts, templates, and completed tasks (prompts that already have their matching report). Seeing a new file alone does not authorize work. A fresh clone of this project contains no live approved task.
+This document is instructions only; it does not approve any task. Execute only a prompt marked APPROVED FOR EXECUTION with the user's authorization for that task: a typed **send it**, a recorded **Send to Claude** click, or a panel-recorded `User authorization: Auto-send. …` line from a verified Auto-send activation. Ignore `prompt/drafts/`, DRAFT prompts, templates, and completed tasks (prompts that already have their matching report). Seeing a new file alone does not authorize work. A fresh clone of this project contains no live approved task.
 
 ## Where to read Codex's prompt
 

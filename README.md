@@ -81,6 +81,15 @@ The studio shows **You** (project owner) directing two workstations: **Codex** (
   - "Working" appears only when Claude's progress receipt (`report/<task-id>-progress.md`) exists.
 - **History**: finished tasks with Claude's report (questions and blockers are flagged), and superseded drafts, which can never be sent.
 
+**Auto-send** (opt-in, off by default) is the switch in the header. Turning it on asks for confirmation and then lets the panel send *new* plans to Claude without a click:
+
+- Only drafts whose file name and Task ID did not exist at the moment you turned it on are eligible. Drafts already waiting, later edits to them, deleted-and-recreated drafts, and drafts created while it was off stay manual. There is no catch-up.
+- A draft is sent only when it is complete and well-formed and has been unchanged for a few seconds, one task at a time, each after the previous task's final report.
+- A report with questions or a blocker pauses Auto-send until you resume it or turn it off.
+- It stays on only while the page that turned it on is open: refreshing or closing that page, or restarting the panel, turns it off. Turning it off never cancels a task that was already sent.
+- Each automatically published prompt records `User authorization: Auto-send. …` with the activation time and ID and the draft's SHA-256 — never a button click. Activations, pauses, and sends are logged in `.tmp/task-panel/auto-send.jsonl` and `approvals.jsonl`.
+- Auto-send does not start or check Claude's monitor; Claude's terminal must still be watching this project.
+
 Only one approved task can be waiting for its final report at a time. This is enforced by the server and survives restarts, because it is worked out from the files on disk. The page refreshes by itself, so new drafts and reports appear without reloading.
 
 The button only publishes a task file. It doesn't type into Claude's terminal or restart a stopped monitor: Claude's terminal monitor must be running in this project to pick the task up.

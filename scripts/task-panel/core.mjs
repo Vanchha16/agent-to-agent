@@ -82,7 +82,7 @@ export function progressMatches(task, text) {
   return meta.taskId === task.id && normalizeRel(meta.sourcePrompt) === task.sourcePrompt
 }
 
-export function createPanel({ root = PROJECT_ROOT, now = () => new Date() } = {}) {
+export function createPanel({ root = PROJECT_ROOT, now = () => new Date(), autoSendTiming = {} } = {}) {
   const base = path.resolve(root)
   let queue = Promise.resolve()
 
@@ -277,8 +277,7 @@ export function createPanel({ root = PROJECT_ROOT, now = () => new Date() } = {}
     }
   }
 
-  function approvedContent(draftText, id, hash, at) {
-    const authorization = `User authorization: Browser-button approval. The user clicked "Send to Claude" in the local task panel for task ${id} at ${at}, approving the reviewed draft prompt/drafts/${id}.md with SHA-256 ${hash}.`
+  function approvedContent(draftText, id, authorization) {
     const lines = draftText.split(/\r?\n/)
     const header = lines.slice(0, 40)
     const rest = lines.slice(40)
@@ -303,6 +302,25 @@ export function createPanel({ root = PROJECT_ROOT, now = () => new Date() } = {}
     return [...updated, ...rest].join('\n')
   }
 
+  async function appendLog(name, entry) {
+    const file = await withinProject(base, `${stateDir}/${name}`)
+    await mkdir(path.dirname(file), { recursive: true })
+    await writeFile(file, `${JSON.stringify(entry)}\n`, { flag: 'a' })
+  }
+
+  // The one protected publication path, shared by manual and automatic sends. The caller holds the send
+  // lock and has just scanned; `item` is that scan's draft, so the published text is exactly the hashed text.
+  async function publishDraft(item, hash, authorization, record) {
+    if (!item.draftText) throw new PanelError(409, 'This task was already published. It cannot be sent again.')
+    if (item.state === 'superseded') throw new PanelError(409, 'This draft is superseded and can never be sent.')
+    if (item.state !== 'draft') throw new PanelError(422, `This draft cannot be sent: ${item.problems.join(' ')}`)
+    if (item.draftHash !== hash) throw new PanelError(409, 'The draft changed after you reviewed it. Review the new version before sending.')
+    if (!item.canSend) throw new PanelError(409, item.sendBlockedReason)
+    await publishAtomically(approvedContent(item.draftText, item.id, authorization), item.sourcePrompt, item.id)
+    await appendLog('approvals.jsonl', { action: 'send', id: item.id, hash, ...record })
+    return { id: item.id, published: item.sourcePrompt, reportPath: item.reportPath, at: record.at }
+  }
+
   // The click on "Send to Claude" is the user's approval for exactly the draft content they reviewed.
   function send(id, reviewedHash) {
     if (typeof id !== 'string' || !TASK_ID_PATTERN.test(id)) return Promise.reject(new PanelError(400, 'Invalid task ID.'))
@@ -313,23 +331,191 @@ export function createPanel({ root = PROJECT_ROOT, now = () => new Date() } = {}
         const state = await scan()
         const item = state.tasks.find(task => task.id === id)
         if (!item) throw new PanelError(404, 'No draft with that task ID.')
-        if (!item.draftText) throw new PanelError(409, 'This task was already published. It cannot be sent again.')
-        if (item.state === 'superseded') throw new PanelError(409, 'This draft is superseded and can never be sent.')
-        if (item.state !== 'draft') throw new PanelError(422, `This draft cannot be sent: ${item.problems.join(' ')}`)
-        if (item.draftHash !== reviewedHash) throw new PanelError(409, 'The draft changed after you reviewed it. Review the new version before sending.')
-        if (!item.canSend) throw new PanelError(409, item.sendBlockedReason)
         const at = now().toISOString()
-        await publishAtomically(approvedContent(item.draftText, id, reviewedHash, at), item.sourcePrompt, id)
-        const log = await withinProject(base, `${stateDir}/approvals.jsonl`)
-        await writeFile(log, `${JSON.stringify({ action: 'send', id, hash: reviewedHash, at, method: 'browser-button' })}\n`, { flag: 'a' })
-        return { id, published: item.sourcePrompt, reportPath: item.reportPath, at }
+        const authorization = `User authorization: Browser-button approval. The user clicked "Send to Claude" in the local task panel for task ${id} at ${at}, approving the reviewed draft prompt/drafts/${id}.md with SHA-256 ${reviewedHash}.`
+        return await publishDraft(item, reviewedHash, authorization, { at, method: 'browser-button' })
       } finally {
         await unlink(lockPath).catch(() => {})
       }
     })
   }
 
-  return { root: base, scan, send }
+  // ---------- Auto-send (opt-in, future-only) ----------
+  // Activation lives only in this server process's memory: a restart, an expired lease, or Off ends it.
+  // It authorizes publishing drafts whose identity (file name and Task ID) did not exist at activation,
+  // one at a time, only inside a tick from the page that holds the activation's secret lease.
+  let auto = null
+  let autoRevision = 0
+  // The activating page renews its lease with every tick; a draft must stay unchanged before it is sent.
+  const LEASE_MS = autoSendTiming.leaseMs ?? 15000
+  const STABLE_MS = autoSendTiming.stableMs ?? 3000
+
+  async function draftIdentities() {
+    const ids = new Set()
+    for (const name of await listMarkdown('prompt/drafts')) {
+      ids.add(name.slice(0, -3))
+      const file = await readRegular(`prompt/drafts/${name}`)
+      const declared = file ? parseMetadata(file.text).taskId : undefined
+      if (declared) ids.add(declared)
+    }
+    return ids
+  }
+
+  const reported = task => task.state === 'report' || task.state === 'blocked'
+  const draftStem = item => (item.draftFile ? path.posix.basename(item.draftFile, '.md') : item.id)
+
+  function expireIfStale() {
+    if (auto && now().getTime() - auto.lastSeen > LEASE_MS) {
+      const ended = auto
+      auto = null
+      autoRevision++
+      return appendLog('auto-send.jsonl', { action: 'expired', activation: ended.id, at: now().toISOString() }).catch(() => {})
+    }
+    return null
+  }
+
+  function autoStatus() {
+    if (!auto) return { on: false, revision: autoRevision }
+    return {
+      on: true,
+      revision: autoRevision,
+      activation: auto.id,
+      activatedAt: auto.activatedAt,
+      excluded: auto.baseline.size,
+      paused: auto.paused,
+      waitingFor: auto.waitingFor,
+      queue: auto.queue,
+      sent: auto.sent,
+      lastError: auto.lastError,
+    }
+  }
+
+  function requireLease(lease) {
+    if (!auto) throw new PanelError(409, 'Auto-send is off.')
+    if (typeof lease !== 'string' || lease !== auto.lease) throw new PanelError(403, 'Auto-send was turned on from another page. Only that page can run it.')
+  }
+
+  function activateAutoSend() {
+    return serialized(async () => {
+      await expireIfStale()
+      if (auto) throw new PanelError(409, 'Auto-send is already on in another page. Turn it off there, or turn it off here first.')
+      const state = await scan()
+      const at = now()
+      auto = {
+        id: randomUUID(),
+        lease: randomUUID() + randomUUID(),
+        activatedAt: at.toISOString(),
+        lastSeen: at.getTime(),
+        baseline: await draftIdentities(),
+        reportedAtStart: new Set(state.tasks.filter(reported).map(task => task.id)),
+        handled: new Set(),
+        seen: new Map(),
+        sent: [],
+        queue: [],
+        waitingFor: state.active,
+        paused: null,
+        lastError: null,
+      }
+      autoRevision++
+      await appendLog('auto-send.jsonl', { action: 'on', activation: auto.id, at: auto.activatedAt, excludedDrafts: [...auto.baseline].sort() })
+      return { lease: auto.lease, status: autoStatus() }
+    })
+  }
+
+  // Off is allowed from any page with the panel token. Because it is serialized with publication,
+  // no automatic publication can start after Off is confirmed; one already published stays published.
+  function deactivateAutoSend(reason = 'off') {
+    return serialized(async () => {
+      await expireIfStale()
+      if (auto) {
+        await appendLog('auto-send.jsonl', { action: reason, activation: auto.id, at: now().toISOString(), sent: auto.sent.map(item => item.id) })
+        auto = null
+        autoRevision++
+      }
+      return { status: autoStatus() }
+    })
+  }
+
+  function resumeAutoSend(lease) {
+    return serialized(async () => {
+      await expireIfStale()
+      requireLease(lease)
+      if (auto.paused) {
+        auto.handled.add(auto.paused.id)
+        await appendLog('auto-send.jsonl', { action: 'resume', activation: auto.id, at: now().toISOString(), after: auto.paused.id })
+        auto.paused = null
+        autoRevision++
+      }
+      auto.lastSeen = now().getTime()
+      return { status: autoStatus() }
+    })
+  }
+
+  // One evaluation step, called by the activating page while it is open. Publishes at most one draft.
+  function tickAutoSend(lease) {
+    return serialized(async () => {
+      await expireIfStale()
+      requireLease(lease)
+      const at = now()
+      auto.lastSeen = at.getTime()
+      const before = JSON.stringify([auto.paused, auto.waitingFor, auto.queue, auto.lastError])
+      const lockPath = await acquireLock()
+      let published = null
+      try {
+        const state = await scan()
+        // Reports received during this activation: questions or a blocker pause dependent automatic work.
+        for (const task of state.tasks) {
+          if (!reported(task) || auto.reportedAtStart.has(task.id) || auto.handled.has(task.id) || auto.paused?.id === task.id) continue
+          if (task.state === 'blocked' || task.hasQuestions) {
+            if (!auto.paused) auto.paused = { id: task.id, title: task.title, reason: task.state === 'blocked' ? 'blocked' : 'questions' }
+          } else auto.handled.add(task.id)
+        }
+        const drafts = state.tasks.filter(task => task.draftText !== undefined && (task.state === 'draft' || task.state === 'malformed'))
+        const inScope = drafts.filter(task => !auto.baseline.has(task.id) && !auto.baseline.has(draftStem(task)))
+        for (const id of [...auto.seen.keys()]) if (!inScope.some(task => task.id === id)) auto.seen.delete(id)
+        for (const task of inScope) {
+          const seen = auto.seen.get(task.id)
+          if (!seen || seen.hash !== task.draftHash) auto.seen.set(task.id, { hash: task.draftHash, since: at.getTime() })
+        }
+        auto.queue = inScope.filter(task => task.state === 'draft').map(task => task.id)
+        auto.waitingFor = state.active
+        if (!auto.paused && state.active.length === 0) {
+          // Complete and unchanged for a short while, so a draft that is still being written is never sent.
+          const ready = inScope
+            .filter(task => task.state === 'draft' && task.canSend && at.getTime() - auto.seen.get(task.id).since >= STABLE_MS)
+            .sort((a, b) => auto.seen.get(a.id).since - auto.seen.get(b.id).since || a.id.localeCompare(b.id))
+          const next = ready[0]
+          if (next) {
+            const when = at.toISOString()
+            const authorization = `User authorization: Auto-send. The user turned on Auto-send in the local task panel at ${auto.activatedAt} (activation ${auto.id}). This draft, prompt/drafts/${next.id}.md, was first seen after that activation and was published automatically at ${when} with SHA-256 ${next.draftHash}. It was not individually reviewed or clicked.`
+            try {
+              published = await publishDraft(next, next.draftHash, authorization, { at: when, method: 'auto-send', activation: auto.id, activatedAt: auto.activatedAt })
+              auto.sent.push({ id: next.id, at: when, hash: next.draftHash })
+              auto.queue = auto.queue.filter(id => id !== next.id)
+              auto.waitingFor = [next.id]
+              auto.lastError = null
+            } catch (error) {
+              auto.lastError = { id: next.id, message: error.message, at: when }
+            }
+          }
+        }
+      } finally {
+        await unlink(lockPath).catch(() => {})
+      }
+      if (published || before !== JSON.stringify([auto.paused, auto.waitingFor, auto.queue, auto.lastError])) autoRevision++
+      return { status: autoStatus(), published }
+    })
+  }
+
+  const autoSend = {
+    activate: activateAutoSend,
+    deactivate: () => deactivateAutoSend('off'),
+    resume: resumeAutoSend,
+    tick: tickAutoSend,
+    status: () => { void expireIfStale(); return autoStatus() },
+  }
+
+  return { root: base, scan, send, autoSend }
 }
 
 function processAlive(pid) {

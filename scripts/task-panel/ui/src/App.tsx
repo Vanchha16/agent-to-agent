@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AutoSendStrip, AutoSendSwitch } from './components/AutoSend.tsx'
 import { ConnectionBanner, TopBar, type Workspace } from './components/Shell.tsx'
 import { TaskDrawer } from './components/TaskDrawer.tsx'
 import { TemplateGallery } from './components/TemplateGallery.tsx'
@@ -7,6 +8,8 @@ import { deriveStudio } from './lib/derive.ts'
 import { ago, useNow, usePanelState, useReducedMotion, useTemplate, useTheme } from './lib/hooks.ts'
 import { createLifecycleTracker, type LifecycleEvent } from './lib/lifecycle.ts'
 import { arrive, handoff, pulse } from './lib/motion.ts'
+import { useAutoSend } from './lib/autoSend.ts'
+import { switchOff } from './lib/autoSendOff.ts'
 import { templateInfo, type TemplateId } from './lib/templates.ts'
 import type { Task } from './lib/types.ts'
 import { LAYOUTS } from './templates/index.ts'
@@ -41,6 +44,36 @@ export function App() {
   const tasks = useMemo(() => state?.tasks ?? [], [state])
   const view = useMemo(() => deriveStudio(tasks), [tasks])
   const openTask = tasks.find(task => task.id === openId) ?? null
+
+  // Auto-send lives here, above the selected layout, so switching templates cannot start, reset, or replay it.
+  const [confirmingAuto, setConfirmingAuto] = useState(false)
+  const [sentHere, setSentHere] = useState<Set<string>>(() => new Set())
+  const auto = useAutoSend(state?.autoSend, result => {
+    const id = result.published?.id
+    if (!id) return
+    tracker.current.markSeen(id, 'published')
+    setSentHere(previous => new Set(previous).add(id))
+    const title = tasks.find(task => task.id === id)?.title ?? id
+    setDelivery(`${title} · sent automatically by Auto-send, waiting for Claude’s receipt`)
+    say(`Auto-send sent ${title} to Claude. It is waiting for Claude’s receipt.`)
+    void refresh(true)
+    window.setTimeout(() => { void handoff(codexRef.current, claudeRef.current, title, reduce).then(() => pulse(claudeRef.current, reduce)) }, 120)
+  })
+
+  function toggleAutoSend() {
+    if (auto.status.on) {
+      setConfirmingAuto(false)
+      // Success is announced only after the server confirms Off; a failed attempt says so instead.
+      void switchOff(auto.deactivate, say)
+    } else setConfirmingAuto(value => !value)
+  }
+
+  async function confirmAutoSend() {
+    if (await auto.activate()) {
+      setConfirmingAuto(false)
+      say('Auto-send is on. Only plans created from now on are sent automatically, one at a time.')
+    }
+  }
 
   // The active template attaches these to its own owner/agent elements for lifecycle motion.
   const bind = useMemo(() => ({
@@ -175,14 +208,16 @@ export function App() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-[1320px] flex-col">
       <TopBar ref={templatesButtonRef} project={state?.project ?? 'project'} live={live} error={Boolean(error)}
-        templateName={templateInfo(template).name} galleryOpen={galleryOpen} onTemplates={openGallery} choice={choice} onTheme={setChoice} />
+        templateName={templateInfo(template).name} galleryOpen={galleryOpen} onTemplates={openGallery} choice={choice} onTheme={setChoice}
+        actions={state ? <AutoSendSwitch auto={auto} confirming={confirmingAuto} onToggle={toggleAutoSend} /> : null} />
       <ConnectionBanner error={error} hasState={Boolean(state)} />
+      <AutoSendStrip auto={auto} confirming={confirmingAuto} tasks={tasks} sentHere={sentHere} onConfirm={() => void confirmAutoSend()} onCancel={() => setConfirmingAuto(false)} />
 
       <Layout ws={ws} />
 
       <footer className="flex flex-wrap justify-between gap-2 border-t border-line px-5 py-4 text-[12.5px] text-sub sm:px-8">
         <span>Keep Claude’s terminal open to receive tasks.</span>
-        <span>This page reads project files and never sends anything on its own.</span>
+        <span>This page reads project files and sends nothing on its own unless you turn on Auto-send.</span>
       </footer>
 
       <TaskDrawer task={openTask} open={Boolean(openTask)} sending={sending} error={sendError} onClose={close} onSend={send} onWait={wait} />

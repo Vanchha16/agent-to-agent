@@ -17,7 +17,11 @@ Claude's terminal monitor picks up approved prompts from `prompt/` and replies i
 7. Claude implements the task within the project folder and runs relevant checks available in the terminal. If requirements are missing, Claude writes questions or blockers to the report and stops dependent work.
 8. Codex waits for the exact report file, reads it, reviews relevant changes, and discusses the outcome or questions with the user. Claude's claims remain distinct from Codex's independent verification.
 9. Codex incorporates the user's answers into the next plan and prompt.
-10. Each new dispatch requires its own **send it** or panel click. Claude does not start the next task on his own.
+10. Each new dispatch requires its own **send it** or panel click, unless the panel's Auto-send exception below applies. Claude does not start the next task on his own.
+
+## Auto-send (opt-in)
+
+**Auto-send (opt-in exception).** When the user turns on Auto-send in the local task panel, the panel itself may publish drafts first created after that activation, one at a time, while the activating page stays open, with a `User authorization: Auto-send. …` line recording the activation time and ID and the draft's SHA-256. That record authorizes only that one published task. It is not a blanket authorization: Codex still never publishes drafts itself without a typed **send it** or a panel click, Claude never dispatches anything, and Auto-send stops when it is turned off, the page closes, or a report raises questions or a blocker. While Auto-send may be on, save a draft with the standard `DRAFT - DO NOT EXECUTE` marker only once its requirements are settled, because a complete, well-formed new draft can be sent automatically; keep unsettled plans under a non-standard marker such as `DRAFT - REQUIREMENTS PENDING - DO NOT EXECUTE`, which the panel never sends.
 
 ## Local task panel
 

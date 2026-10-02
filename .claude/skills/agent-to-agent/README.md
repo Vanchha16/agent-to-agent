@@ -10,7 +10,7 @@ This is the Claude-side half of the Codex ↔ Claude handoff. Codex plans and pu
 
 ## Using it
 
-- Type `/agent-to-agent` in Claude Code to start or resume the receiver role in the current project. Invoking it does **not** approve any task; tasks still need the user's explicit "send it" and an `APPROVED FOR EXECUTION` prompt.
+- Type `/agent-to-agent` in Claude Code to start or resume the receiver role in the current project. Invoking it does **not** approve any task; tasks still need an `APPROVED FOR EXECUTION` prompt with the user's real authorization (a typed "send it", a recorded Send to Claude click, or a panel-recorded Auto-send activation).
 - `/skills` (plural) lists the skills Claude Code has discovered.
 - If this folder was added while a session was already running, run `/reload-skills` or start a new session so the skill is picked up.
 - The skill sets `disable-model-invocation: true`, so Claude only runs it when you invoke it yourself.

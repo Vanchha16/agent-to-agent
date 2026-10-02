@@ -100,7 +100,7 @@ export function CyberTemplate({ ws }: { ws: Workspace }) {
                   </button>
                   {step?.who ? <p className="m-0 text-[13px] text-sub">Next: <strong className="font-semibold text-ink">{step.who}</strong> · {step.what}</p> : null}
                 </div>
-                {focus.state === 'draft' ? <p className="m-0 mt-3 text-[12.5px] text-sub">Approval happens only inside the review panel, with Send to Claude for this exact plan.</p> : null}
+                {focus.state === 'draft' ? <p className="m-0 mt-3 text-[12.5px] text-sub">Approval happens in the review panel with Send to Claude, or through Auto-send only for plans created after you turned it on.</p> : null}
               </div>
             ) : <p className="mb-0 mt-5 text-[14px] text-sub">No mission on deck. When Codex saves a plan in prompt/drafts/, it appears here for your approval.</p>}
             <p ref={bind.delivery} className="cy-feed mb-0 mt-7 border-t border-line pt-3 font-mono text-[12px] text-sub">{ws.delivery || DELIVERY_IDLE}</p>

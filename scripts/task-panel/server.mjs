@@ -117,8 +117,13 @@ export async function startPanelServer({ root = PROJECT_ROOT, port = DEFAULT_POR
       const site = request.headers['sec-fetch-site']
       if (site !== undefined && site !== 'same-origin') return send(response, 403, { error: 'Cross-site requests are not allowed.' })
 
-      if (request.method === 'GET' && url.pathname === '/api/state') return send(response, 200, { ...(await panel.scan()), project: path.basename(path.resolve(root)) })
-      if (request.method === 'POST' && url.pathname === '/api/send') {
+      if (request.method === 'GET' && url.pathname === '/api/state') {
+        const state = await panel.scan()
+        const autoSend = panel.autoSend.status()
+        // The Auto-send revision is part of the version, so every open page sees it change.
+        return send(response, 200, { ...state, version: `${state.version}:${autoSend.revision}`, autoSend, project: path.basename(path.resolve(root)) })
+      }
+      if (request.method === 'POST' && (url.pathname === '/api/send' || url.pathname === '/api/auto-send')) {
         if (!/^application\/json\b/i.test(request.headers['content-type'] ?? '')) return send(response, 415, { error: 'Expected application/json.' })
         let payload
         try {
@@ -127,9 +132,30 @@ export async function startPanelServer({ root = PROJECT_ROOT, port = DEFAULT_POR
           if (error instanceof PanelError) throw error
           return send(response, 400, { error: 'Invalid JSON body.' })
         }
-        const result = await panel.send(payload?.id, payload?.hash)
-        log(`Published ${result.published} after a Send to Claude click (${result.at}).`)
-        return send(response, 200, result)
+        if (url.pathname === '/api/send') {
+          const result = await panel.send(payload?.id, payload?.hash)
+          log(`Published ${result.published} after a Send to Claude click (${result.at}).`)
+          return send(response, 200, result)
+        }
+        // Auto-send: on/off/resume are the user's own actions; tick is the activating page's heartbeat.
+        const action = payload?.action
+        if (action === 'on') {
+          const result = await panel.autoSend.activate()
+          log(`Auto-send turned on (activation ${result.status.activation}). Only drafts created after this are eligible.`)
+          return send(response, 200, result)
+        }
+        if (action === 'off') {
+          const result = await panel.autoSend.deactivate()
+          log('Auto-send turned off.')
+          return send(response, 200, result)
+        }
+        if (action === 'resume') return send(response, 200, await panel.autoSend.resume(payload?.lease))
+        if (action === 'tick') {
+          const result = await panel.autoSend.tick(payload?.lease)
+          if (result.published) log(`Auto-send published ${result.published.published} (${result.published.at}).`)
+          return send(response, 200, result)
+        }
+        return send(response, 400, { error: 'Unknown Auto-send action.' })
       }
       return send(response, 405, { error: 'Method not allowed.' })
     }

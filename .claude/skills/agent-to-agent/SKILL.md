@@ -42,6 +42,7 @@ Execute a prompt only when **all** of these hold:
 - It says `Delivery status: APPROVED FOR EXECUTION`.
 - It has a `Task ID`, a `Source prompt`, and an exact `Report path`.
 - It records the user's real authorization for *this* task in a `User authorization:` line. That means an explicit **send it**, an explicit instruction to send that exact task, or a recorded browser-button approval from a local task panel (the user clicked **Send to Claude** for that task, with its timestamp and draft hash).
+  A panel-recorded `User authorization: Auto-send. …` line also counts for that one task: the user turned on the panel's opt-in Auto-send at a recorded time with an activation ID, and the draft was first seen after that activation, with its SHA-256. It is never a blanket approval for other files.
 - It has no matching completed report yet.
 
 Never execute these:

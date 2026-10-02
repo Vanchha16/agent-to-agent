@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, type ReactNode } from 'react'
 import { LayoutTemplate, Monitor, Moon, Orbit, Sun } from 'lucide-react'
 import type { ApiError } from '../lib/api.ts'
 import { STATE_LABEL, type StudioView } from '../lib/derive.ts'
@@ -97,9 +97,11 @@ interface TopBarProps {
   onTemplates: () => void
   choice: ThemeChoice
   onTheme: (choice: ThemeChoice) => void
+  // Shared controls placed before Templates (the Auto-send switch).
+  actions?: ReactNode
 }
 
-export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar({ project, live, error, templateName, galleryOpen, onTemplates, choice, onTheme }, ref) {
+export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar({ project, live, error, templateName, galleryOpen, onTemplates, choice, onTheme, actions }, ref) {
   return (
     <header className="topbar flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 border-b border-line px-5 py-3.5 sm:px-8">
       <div className="flex min-w-0 items-center gap-2.5 font-semibold">
@@ -111,6 +113,7 @@ export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar
         <p className={`m-0 flex items-center gap-2 text-[12.5px] ${error ? 'text-bad' : 'text-sub'}`} role="status">
           <span className={`dot ${error ? '' : 'tone-report'}`} />{live}
         </p>
+        {actions}
         <button ref={ref} type="button" onClick={onTemplates} aria-haspopup="dialog" aria-expanded={galleryOpen}
           className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink transition-colors hover:bg-soft">
           <LayoutTemplate size={15} strokeWidth={1.8} aria-hidden="true" />
