@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="panel-token" content="__PANEL_TOKEN__">
+  <title>Command center · Claude task panel</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#detail">Skip to task details</a>
+  <div class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">Project command center</p>
+        <h1>Your team, your call</h1>
+        <p class="sub">Codex plans the work, Claude builds it, and nothing starts until you approve it.</p>
+      </div>
+      <div class="mast-status">
+        <p class="live" id="live" role="status" aria-live="polite">Connecting…</p>
+        <p class="reminder">Keep Claude's terminal open to receive tasks.</p>
+      </div>
+    </header>
+
+    <section aria-label="Your team">
+      <ol class="chain">
+        <li class="member lead" id="card-you" data-state="idle">
+          <span class="portrait" data-portrait="lead"></span>
+          <div class="who"><p class="name">You</p><span class="role">Project lead</span></div>
+          <p class="duty">Approve every task before Claude starts.</p>
+          <p class="m-status" data-status>—</p>
+          <button type="button" class="m-task" data-task hidden></button>
+        </li>
+        <li class="member" id="card-codex" data-state="idle">
+          <span class="portrait logo logo-codex"><picture><source srcset="/logos/openai-blossom-white.svg" media="(prefers-color-scheme: dark)"><img src="/logos/openai-blossom-black.svg" alt="Codex logo (OpenAI Blossom)" width="64" height="64"></picture></span>
+          <div class="who"><p class="name">Codex</p><span class="role">Planner</span></div>
+          <p class="duty">Turns your requirements into task plans.</p>
+          <p class="m-status" data-status>—</p>
+          <button type="button" class="m-task" data-task hidden></button>
+        </li>
+        <li class="member" id="card-claude" data-state="idle">
+          <span class="portrait logo logo-claude"><img src="/logos/claude-spark-clay.svg" alt="Claude logo (Claude Spark)" width="64" height="64"></span>
+          <div class="who"><p class="name">Claude</p><span class="role">Builder</span></div>
+          <p class="duty">Builds approved tasks and reports back.</p>
+          <p class="m-status" data-status>—</p>
+          <button type="button" class="m-task" data-task hidden></button>
+        </li>
+      </ol>
+    </section>
+
+    <section aria-label="Project overview">
+      <dl class="tiles">
+        <div class="tile t-approval" data-tile="approval"><dt>Awaiting your approval</dt><dd class="value">–</dd><dd class="note"></dd></div>
+        <div class="tile t-claude" data-tile="claude"><dt>With Claude</dt><dd class="value">–</dd><dd class="note"></dd></div>
+        <div class="tile t-reports" data-tile="reports"><dt>Reports received</dt><dd class="value">–</dd><dd class="note"></dd></div>
+        <div class="tile t-questions" data-tile="questions"><dt>Reports with questions</dt><dd class="value">–</dd><dd class="note"></dd></div>
+      </dl>
+    </section>
+
+    <main class="layout">
+      <nav class="list" aria-label="Tasks">
+        <div class="list-head"><h2>Tasks</h2></div>
+        <div id="list-body" class="list-body">
+          <p class="placeholder">Loading tasks…</p>
+        </div>
+      </nav>
+
+      <section class="detail" id="detail" tabindex="-1" aria-live="polite">
+        <div class="empty-detail">
+          <h2>Pick a task</h2>
+          <p>Choose a plan to review it, or a sent task to see Claude's report.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite" hidden></div>
+  <div id="announcer" class="sr-only" aria-live="polite"></div>
+
+  <!-- Unused since task 20261001-agent-profile-logos: the earlier illustrated agent portraits, kept for history only.
+       The Codex and Claude profiles now show the official logos from /logos/. -->
+  <template id="tpl-codex">
+    <svg viewBox="0 0 80 80" role="img" aria-label="Illustrated portrait of Codex, the planner agent">
+      <circle class="pt-bg-codex" cx="40" cy="40" r="40"/>
+      <path class="pt-wear-codex" d="M9 82c2-15 15-24 31-24s29 9 31 24z"/>
+      <path class="pt-collar" d="M33 58l7 8 7-8"/>
+      <rect class="pt-shade-a" x="34" y="46" width="12" height="13" rx="5"/>
+      <circle class="pt-skin-a" cx="25.5" cy="36" r="3.2"/>
+      <circle class="pt-skin-a" cx="54.5" cy="36" r="3.2"/>
+      <ellipse class="pt-skin-a" cx="40" cy="34.5" rx="14" ry="16"/>
+      <path class="pt-hair-a" d="M25.5 32c-1.5-12 6.5-18.5 15-18.5 9.5 0 16.5 6 14.5 18.5-2.5-5.5-8-8.5-15-8.5-6.5 0-11.5 3-14.5 8.5z"/>
+      <g class="pt-eyes"><circle class="pt-eye" cx="33.6" cy="36" r="1.5"/><circle class="pt-eye" cx="46.4" cy="36" r="1.5"/></g>
+      <rect class="pt-line" x="28.6" y="32" width="10" height="7.6" rx="3.2"/>
+      <rect class="pt-line" x="41.4" y="32" width="10" height="7.6" rx="3.2"/>
+      <path class="pt-line" d="M38.6 35.2h2.8"/>
+      <path class="pt-mouth" d="M35.5 43.5q4.5 3.6 9 0"/>
+    </svg>
+  </template>
+  <template id="tpl-claude">
+    <svg viewBox="0 0 80 80" role="img" aria-label="Illustrated portrait of Claude, the builder agent">
+      <circle class="pt-bg-claude" cx="40" cy="40" r="40"/>
+      <path class="pt-hair-b" d="M24 39c-2-15 6-24 16-24s18 9 16 24c-.6 5-3 10-5 12H29c-2-2-4.4-7-5-12z"/>
+      <circle class="pt-hair-b" cx="40" cy="12.5" r="6"/>
+      <path class="pt-wear-claude" d="M9 82c2-15 15-24 31-24s29 9 31 24z"/>
+      <path class="pt-collar" d="M33.5 58q6.5 5 13 0"/>
+      <rect class="pt-shade-b" x="34.2" y="46" width="11.6" height="13" rx="5"/>
+      <circle class="pt-skin-b" cx="26.2" cy="36.5" r="3"/>
+      <circle class="pt-skin-b" cx="53.8" cy="36.5" r="3"/>
+      <ellipse class="pt-skin-b" cx="40" cy="35" rx="13.6" ry="15.6"/>
+      <path class="pt-hair-b" d="M26.6 31c2-9 8.5-12.5 14-12.5 7 0 12.6 4.6 13 12-5.5-4.5-12-5.6-18.5-3.8-3.4 1-6 2.4-8.5 4.3z"/>
+      <circle class="pt-cheek" cx="31.5" cy="41" r="2.6"/>
+      <circle class="pt-cheek" cx="48.5" cy="41" r="2.6"/>
+      <g class="pt-eyes"><circle class="pt-eye" cx="34" cy="36.4" r="1.5"/><circle class="pt-eye" cx="46" cy="36.4" r="1.5"/></g>
+      <path class="pt-line" d="M31 32.4q3-1.6 6 0M43 32.4q3-1.6 6 0"/>
+      <path class="pt-mouth" d="M35.5 43.6q4.5 3.8 9 0"/>
+    </svg>
+  </template>
+  <template id="tpl-lead">
+    <svg viewBox="0 0 80 80" role="img" aria-label="You, the project lead">
+      <circle class="pt-bg-lead" cx="40" cy="40" r="40"/>
+      <circle class="pt-figure" cx="40" cy="32" r="12.5"/>
+      <path class="pt-figure" d="M15 72c2.5-13 13-20 25-20s22.5 7 25 20a40 40 0 0 1-50 0z"/>
+    </svg>
+  </template>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "name": "claude-codex-handoff",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Codex-to-Claude handoff workspace: shared-folder prompts and reports, the AI Studio task panel (React + Tailwind), and a terminal bridge.",
+  "type": "module",
+  "scripts": {
+    "bridge": "node scripts/claude-bridge.mjs",
+    "test:bridge": "node --test scripts/claude-bridge.test.mjs",
+    "panel": "node scripts/task-panel/server.mjs",
+    "panel:start": "node scripts/task-panel/start.mjs",
+    "panel:stop": "node scripts/task-panel/stop.mjs",
+    "test:panel": "node --test scripts/task-panel/task-panel.test.mjs",
+    "ui:build": "vite build --config scripts/task-panel/ui/vite.config.ts",
+    "ui:watch": "vite build --watch --config scripts/task-panel/ui/vite.config.ts",
+    "ui:typecheck": "tsc -p scripts/task-panel/ui/tsconfig.json"
+  },
+  "dependencies": {
+    "lucide-react": "^1.49.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.0",
+    "vite": "^7.3.6"
+  }
+}

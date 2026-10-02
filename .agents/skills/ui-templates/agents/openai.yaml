@@ -1,0 +1,4 @@
+interface:
+  display_name: "Selectable UI Templates"
+  short_description: "Plan six selectable designs for one website"
+  default_prompt: "Use $ui-templates to plan a gallery of selectable UI designs for the same website, including Studio, Dashboard, Board, Terminal, Minimal, and Cyber, while preserving shared features and the project's approval workflow."

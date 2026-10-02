@@ -1,0 +1,27 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.local
+playwright-report/
+test-results/
+.npm-cache/
+.tmp/
+.browsers/
+.claude-local/
+.claude/settings.local.json
+
+# Task history, drafts, and bridge records stay local. Only the shared handoff
+# instructions and templates are published.
+/prompt/*
+!/prompt/WORKFLOW.md
+!/prompt/AGENT_TO_AGENT.md
+!/prompt/CLAUDE_TASK_TEMPLATE.md
+!/prompt/TO_CLAUDE.md
+/report/*
+!/report/CLAUDE_REPORT_TEMPLATE.md
+
+# Local screenshots, early design experiments, and scratch files
+/.image/
+/planning/
+/test.txt

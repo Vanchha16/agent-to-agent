@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent to Agent"
+  short_description: "Plan with Codex, build with Claude, review reports"
+  default_prompt: "Use $agent-to-agent to plan this project with me and hand approved implementation tasks to Claude."

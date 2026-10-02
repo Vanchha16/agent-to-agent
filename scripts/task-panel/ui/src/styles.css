@@ -1,0 +1,302 @@
+@import "tailwindcss";
+
+/* Theme is chosen in the app (System / Light / Dark) and stamped on <html data-theme>. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* Semantic tokens: warm neutral studio. Components reference these only. */
+:root, .skin-studio {
+  --bg: #faf9f6;
+  --surface: #ffffff;
+  --soft: #efefe9;
+  --sunk: #f5f4ef;
+  --ink: #24282a;
+  --ink-2: #3d4244;
+  --sub: #64686a;
+  --line: #e4e4de;
+  --line-strong: #d3d4cd;
+  --action: #24282a;
+  --action-hover: #3a3f41;
+  --action-ink: #ffffff;
+  --ok: #3b7a57;
+  --warn: #95680f;
+  --bad: #a63a30;
+  --info: #3e5f86;
+  --ok-soft: #edf5f0;
+  --warn-soft: #faf3e3;
+  --bad-soft: #fbefed;
+  --info-soft: #eef3f9;
+  --shadow-desk: 0 1px 2px rgb(37 40 42 / 4%), 0 6px 16px rgb(37 40 42 / 5%);
+  --ui-font: "Segoe UI Variable Text", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --head-font: "Segoe UI Variable Display", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --focus: var(--ink);
+  color-scheme: light;
+}
+[data-theme="dark"], [data-theme="dark"].skin-studio, [data-theme="dark"] .skin-studio {
+  --bg: #191b1c;
+  --surface: #232628;
+  --soft: #2a2e2f;
+  --sunk: #1f2223;
+  --ink: #f2f3ef;
+  --ink-2: #d4d7d2;
+  --sub: #a7aead;
+  --line: #373c3c;
+  --line-strong: #454b4b;
+  --action: #e8eae4;
+  --action-hover: #ffffff;
+  --action-ink: #24282a;
+  --ok: #7cc29a;
+  --warn: #d8b062;
+  --bad: #e38b80;
+  --info: #93b2da;
+  --ok-soft: #1f2b25;
+  --warn-soft: #2d2719;
+  --bad-soft: #301f1d;
+  --info-soft: #1e2632;
+  --shadow-desk: 0 1px 2px rgb(0 0 0 / 25%), 0 8px 20px rgb(0 0 0 / 18%);
+  color-scheme: dark;
+}
+
+/* ---------- UI template skins ----------
+   Each template redefines the same semantic tokens for light and dark. The skin class sits on <html>
+   (so the shared drawer and gallery follow it) and on gallery thumbnails (so each preview shows its own look).
+   Every skin sets every token in both modes, so nothing leaks between skins. */
+.skin-dashboard {
+  --bg: #f4f6f9; --surface: #ffffff; --soft: #eaeef3; --sunk: #f6f8fa;
+  --ink: #1b2430; --ink-2: #334050; --sub: #566476; --line: #dfe4ea; --line-strong: #c9d1db;
+  --action: #2453c7; --action-hover: #1d46ab; --action-ink: #ffffff;
+  --ok: #23714a; --warn: #855a00; --bad: #ae3328; --info: #2c5c9b;
+  --ok-soft: #e9f5ee; --warn-soft: #fbf2df; --bad-soft: #fcecea; --info-soft: #e9f0fa;
+  --shadow-desk: 0 1px 2px rgb(27 36 48 / 5%);
+  --ui-font: "Segoe UI Variable Text", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --head-font: "Segoe UI Variable Display", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --focus: #2453c7;
+  color-scheme: light;
+}
+[data-theme="dark"].skin-dashboard, [data-theme="dark"] .skin-dashboard {
+  --bg: #10151c; --surface: #18202a; --soft: #212b37; --sunk: #141b23;
+  --ink: #e8edf3; --ink-2: #c9d2dc; --sub: #9ba8b7; --line: #2a3542; --line-strong: #3a4757;
+  --action: #7aa2ff; --action-hover: #98b7ff; --action-ink: #0b1220;
+  --ok: #6fcf97; --warn: #e2b45c; --bad: #f08a7e; --info: #8db4ea;
+  --ok-soft: #17271f; --warn-soft: #2b2416; --bad-soft: #2e1c1b; --info-soft: #182435;
+  --shadow-desk: 0 1px 2px rgb(0 0 0 / 30%);
+  --focus: #98b7ff;
+  color-scheme: dark;
+}
+
+.skin-board {
+  --bg: #f6f3ee; --surface: #fffdf9; --soft: #ece6dc; --sunk: #f2ede5;
+  --ink: #2a2620; --ink-2: #443f38; --sub: #675f55; --line: #e2d9cc; --line-strong: #cfc4b3;
+  --action: #1d5c58; --action-hover: #164a47; --action-ink: #ffffff;
+  --ok: #2e6f47; --warn: #87590a; --bad: #a83a2c; --info: #3a5f8a;
+  --ok-soft: #ebf4ec; --warn-soft: #f9eedb; --bad-soft: #fbece7; --info-soft: #ebf1f7;
+  --shadow-desk: 0 1px 1px rgb(60 45 25 / 6%), 0 3px 8px rgb(60 45 25 / 6%);
+  --ui-font: "Segoe UI Variable Text", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --head-font: "Segoe UI Variable Display", "SF Pro Rounded", "SF Pro Display", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --focus: #1d5c58;
+  color-scheme: light;
+}
+[data-theme="dark"].skin-board, [data-theme="dark"] .skin-board {
+  --bg: #1a1815; --surface: #25221e; --soft: #2f2b26; --sunk: #201d1a;
+  --ink: #f3efe8; --ink-2: #d9d3c9; --sub: #ada596; --line: #3b3630; --line-strong: #4c463e;
+  --action: #7ccac2; --action-hover: #9bdcd5; --action-ink: #102321;
+  --ok: #86c99a; --warn: #e0b766; --bad: #ec8f7f; --info: #9cb9dc;
+  --ok-soft: #1e2a21; --warn-soft: #2e2617; --bad-soft: #321f1b; --info-soft: #1f2631;
+  --shadow-desk: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 10px rgb(0 0 0 / 18%);
+  --focus: #9bdcd5;
+  color-scheme: dark;
+}
+
+.skin-terminal {
+  --bg: #f1f2ee; --surface: #fbfbf8; --soft: #e5e7e1; --sunk: #ebede7;
+  --ink: #141915; --ink-2: #2b322d; --sub: #525b55; --line: #d3d7cf; --line-strong: #a7ada4;
+  --action: #14532d; --action-hover: #0f4123; --action-ink: #f1fff5;
+  --ok: #1d6a3b; --warn: #7a5200; --bad: #a12d24; --info: #1f4f86;
+  --ok-soft: #e6f3ea; --warn-soft: #f7efdc; --bad-soft: #f9e8e6; --info-soft: #e7eef8;
+  --shadow-desk: none;
+  --ui-font: "Segoe UI Variable Text", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --head-font: ui-monospace, "Cascadia Code", "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --focus: #14532d;
+  color-scheme: light;
+}
+[data-theme="dark"].skin-terminal, [data-theme="dark"] .skin-terminal {
+  --bg: #0b0f0d; --surface: #111714; --soft: #19221d; --sunk: #0e1411;
+  --ink: #d9f2e2; --ink-2: #b7d5c2; --sub: #8aa797; --line: #24312b; --line-strong: #3a5246;
+  --action: #7ee2a8; --action-hover: #a3f0c3; --action-ink: #06130c;
+  --ok: #7ee2a8; --warn: #f0c674; --bad: #ff8f80; --info: #8ec5ff;
+  --ok-soft: #12241a; --warn-soft: #2a2414; --bad-soft: #2e1714; --info-soft: #132233;
+  --shadow-desk: none;
+  --focus: #7ee2a8;
+  color-scheme: dark;
+}
+
+.skin-minimal {
+  --bg: #ffffff; --surface: #ffffff; --soft: #f3f3f2; --sunk: #f7f7f6;
+  --ink: #111111; --ink-2: #333333; --sub: #666666; --line: #eaeae8; --line-strong: #d3d3d0;
+  --action: #111111; --action-hover: #333333; --action-ink: #ffffff;
+  --ok: #2f6f45; --warn: #85590a; --bad: #a6352b; --info: #3a5b84;
+  --ok-soft: #edf5ef; --warn-soft: #faf2e2; --bad-soft: #fbedeb; --info-soft: #eef2f8;
+  --shadow-desk: none;
+  --ui-font: "Segoe UI Variable Text", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --head-font: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --focus: #111111;
+  color-scheme: light;
+}
+[data-theme="dark"].skin-minimal, [data-theme="dark"] .skin-minimal {
+  --bg: #121212; --surface: #161616; --soft: #232323; --sunk: #1a1a1a;
+  --ink: #f4f4f4; --ink-2: #d6d6d6; --sub: #a3a3a3; --line: #2b2b2b; --line-strong: #3d3d3d;
+  --action: #f4f4f4; --action-hover: #ffffff; --action-ink: #111111;
+  --ok: #86c79c; --warn: #dcb066; --bad: #ea8b7f; --info: #98b5dc;
+  --ok-soft: #1c2820; --warn-soft: #2c2517; --bad-soft: #301d1b; --info-soft: #1d2430;
+  --shadow-desk: none;
+  --focus: #f4f4f4;
+  color-scheme: dark;
+}
+
+.skin-cyber {
+  --bg: #edf1f7; --surface: #f9fbfe; --soft: #e1e7f1; --sunk: #e9eef6;
+  --ink: #0e1626; --ink-2: #25314a; --sub: #4b5871; --line: #c8d2e3; --line-strong: #9eaecb;
+  --action: #0e7490; --action-hover: #0b5f76; --action-ink: #ffffff;
+  --ok: #15803d; --warn: #855700; --bad: #b42318; --info: #1d4ed8;
+  --ok-soft: #e4f4ea; --warn-soft: #f8efd9; --bad-soft: #fbe9e7; --info-soft: #e5ecfb;
+  --shadow-desk: none;
+  --neon-a: #0891b2; --neon-b: #7c3aed; --glow: rgb(8 145 178 / 16%); --grid: rgb(14 22 38 / 5%);
+  --ui-font: "Segoe UI Variable Text", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --head-font: Bahnschrift, "DIN Alternate", "Segoe UI Variable Display", "SF Pro Display", system-ui, sans-serif;
+  --focus: #7c3aed;
+  color-scheme: light;
+}
+[data-theme="dark"].skin-cyber, [data-theme="dark"] .skin-cyber {
+  --bg: #060a14; --surface: #0c1322; --soft: #13203a; --sunk: #091022;
+  --ink: #e6f1ff; --ink-2: #c3d3ec; --sub: #8fa3c4; --line: #1d2b46; --line-strong: #2e4369;
+  --action: #22d3ee; --action-hover: #67e8f9; --action-ink: #04121a;
+  --ok: #4ade80; --warn: #fbbf24; --bad: #fb7185; --info: #93c5fd;
+  --ok-soft: #0d2418; --warn-soft: #2a2110; --bad-soft: #2d1320; --info-soft: #10203a;
+  --shadow-desk: none;
+  --neon-a: #22d3ee; --neon-b: #a78bfa; --glow: rgb(34 211 238 / 16%); --grid: rgb(120 170 255 / 5%);
+  --focus: #22d3ee;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-soft: var(--soft);
+  --color-sunk: var(--sunk);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-sub: var(--sub);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-action: var(--action);
+  --color-action-hover: var(--action-hover);
+  --color-action-ink: var(--action-ink);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-info: var(--info);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad-soft: var(--bad-soft);
+  --color-info-soft: var(--info-soft);
+  --shadow-desk: var(--shadow-desk);
+  --font-sans: var(--ui-font);
+  --font-display: var(--head-font);
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --ease-out-soft: cubic-bezier(.2, .8, .2, 1);
+}
+
+@layer base {
+  html { scroll-padding-top: 88px; -webkit-text-size-adjust: 100%; }
+  body { @apply bg-bg text-ink font-sans antialiased; font-size: 15px; line-height: 1.55; }
+  :focus-visible { outline: 2px solid var(--focus, var(--ink)); outline-offset: 2px; border-radius: 6px; }
+  ::selection { background: var(--line-strong); }
+}
+
+@layer components {
+  .eyebrow { @apply text-[11px] font-semibold tracking-[.1em] uppercase text-sub; }
+  .dot { @apply inline-block size-[7px] shrink-0 rounded-full bg-line-strong; }
+  .tone-ready .dot, .dot.tone-ready { background: var(--ink-2); }
+  .tone-waiting .dot, .dot.tone-waiting { background: var(--info); }
+  .tone-working .dot, .dot.tone-working { background: var(--warn); }
+  .tone-report .dot, .dot.tone-report { background: var(--ok); }
+  .tone-attention .dot, .dot.tone-attention { background: var(--warn); }
+
+  /* Markdown documents (plans and reports) */
+  .md { @apply text-[14.5px] leading-relaxed text-ink-2 break-words; }
+  .md-h1 { @apply font-display text-[17px] font-semibold text-ink mt-5 mb-2; }
+  .md-h2 { @apply font-display text-[15.5px] font-semibold text-ink mt-5 mb-2; }
+  .md-h3 { @apply text-[14.5px] font-semibold text-ink mt-4 mb-1.5; }
+  .md-code { @apply font-mono text-[.86em] bg-soft rounded px-1.5 py-px; }
+  .md-pre { @apply font-mono text-[13px] bg-soft rounded-lg px-3.5 py-3 my-3 overflow-x-auto; }
+  .md-ul { @apply list-disc pl-5 my-2 space-y-0.5; }
+  .md-ol { @apply list-decimal pl-5 my-2 space-y-0.5; }
+  .md-table { @apply border-collapse text-[13.5px]; }
+  .md-table th, .md-table td { @apply border border-line px-2.5 py-1.5 text-left align-top; }
+  .md-table th { @apply font-semibold text-ink; }
+
+  /* Native dialog used as the details drawer */
+  .drawer { @apply fixed m-0 p-0 border-0 bg-transparent max-w-none max-h-none w-full h-full; }
+  .drawer::backdrop { background: rgb(20 22 23 / 38%); }
+  .drawer[open] .drawer-panel { animation: drawer-in 280ms var(--ease-out-soft); }
+  .drawer[open]::backdrop { animation: fade-in 220ms ease-out; }
+
+  .working-bar { @apply relative h-[3px] w-full overflow-hidden rounded-full bg-line; }
+  .working-bar::after { content: ""; @apply absolute inset-y-0 left-0 w-1/3 rounded-full; background: var(--warn); animation: working 1.8s ease-in-out infinite; }
+
+  /* Template gallery: a native modal dialog, never open at the same time as the drawer */
+  .gallery { @apply fixed m-0 p-0 border-0 bg-transparent max-w-none max-h-none w-full h-full; }
+  .gallery::backdrop { background: rgb(20 22 23 / 42%); }
+  .gallery[open] .gallery-panel { animation: rise-in 240ms var(--ease-out-soft); }
+  .gallery[open]::backdrop { animation: fade-in 200ms ease-out; }
+  .thumb { font-size: 0; }
+  .thumb .dot { width: 4px; height: 4px; }
+
+  /* Terminal: crisp, square details */
+  .skin-terminal .dot { border-radius: 1px; }
+  html.skin-terminal .topbar-brand { font-family: var(--head-font); letter-spacing: .04em; }
+  html.skin-terminal .topbar :is(button, [role="radiogroup"]) { border-radius: 3px; }
+
+  /* Cyber: angular panels. The outer layer is the 1px border (or the neon accent), the inner layer the surface. */
+  .cy-floor {
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .cy-panel, .cy-panel > .cy-inner {
+    --cut: 16px;
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .cy-panel { height: 100%; padding: 1px; background: var(--line-strong); }
+  .cy-panel > .cy-inner { background: var(--surface); }
+  .cy-panel-accent { background: linear-gradient(135deg, var(--neon-a), var(--line-strong) 45%, var(--neon-b)); }
+  .cy-glow { filter: drop-shadow(0 0 22px var(--glow)); }
+  .cy-title { font-family: var(--head-font); }
+  .cy-accent-bar { background: linear-gradient(90deg, var(--neon-a), var(--neon-b)); }
+  .cy-line, .cy-crew { background: var(--sunk); border-left: 2px solid var(--line-strong); }
+  .cy-line:hover { border-left-color: var(--neon-a); background: var(--soft); }
+  .cy-crew.tone-ready { border-left-color: var(--neon-b); }
+  .cy-crew.tone-working, .cy-crew.tone-waiting { border-left-color: var(--neon-a); }
+  .cy-crew.tone-attention { border-left-color: var(--warn); }
+  .cy-stat { background: var(--sunk); border: 1px solid var(--line); }
+  .cy-cta:focus-visible { outline: 2px solid var(--action-ink); outline-offset: -5px; }
+  .cy-thumb-panel {
+    background: var(--surface); border: 1px solid var(--line-strong);
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+  html.skin-cyber .topbar-brand { font-family: var(--head-font); text-transform: uppercase; letter-spacing: .18em; }
+
+  /* Minimal: hide the native disclosure marker; the chevron carries it */
+  .minimal-history > summary::-webkit-details-marker { display: none; }
+
+  .handoff-chip { @apply pointer-events-none fixed left-0 top-0 z-50 flex max-w-[240px] items-center gap-2 truncate rounded-lg bg-action px-3 py-2 text-[12.5px] font-medium text-action-ink shadow-lg; }
+}
+
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise-in { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes working { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
+  .working-bar::after { animation: none; left: 0; width: 100%; opacity: .55; }
+}
